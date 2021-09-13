@@ -17,22 +17,34 @@ The project is a web application and a database, raised in two docker containers
   source venv/bin/activate
 ```
 
-#### 4. Install docker и docker-compose
+#### 2. Install docker и docker-compose
 If you already have docker and docker-compose installed, you can skip this step. If not, the installation instructions are https://docs.docker.com/engine/install/
 
 5. Starting the container
 ```shell
-make docker
+make docker_prod
 ```
 6. Turning off the container
 ```shell
-make down
+make docker_down
 ```
 
 # Examples of use
+
+#### Install Django migrate
+```shell
+docker-compose exec app python manage.py makemigrations
+docker-compose exec app python manage.py migrate
+```
+
+#### Install static project
+```shell
+docker-compose exec app python manage.py collectstatic
+```
+
 #### Creating a Django superuser
 ```shell
-docker-compose run app python manage.py createsuperuser
+docker-compose exec app python manage.py createsuperuser
 ```
 
 #### View API documentation
