@@ -1,0 +1,15 @@
+**/.idea
+**/*.md
+**/.git
+**/clean
+
+__pycache__/
+*.py[cod]
+
+.venv
+
+.idea
+.DS_Store
+
+media/
+sent_emails/

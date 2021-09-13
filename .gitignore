@@ -81,8 +81,11 @@ target/
 profile_default/
 ipython_config.py
 
+# email
+sent_emails
+
 # pyenv
-.python-version
+# .python-version
 
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
@@ -102,6 +105,8 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+.env.dev
+.env.prod
 .env
 .venv
 env/
