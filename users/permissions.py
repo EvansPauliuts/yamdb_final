@@ -5,18 +5,21 @@ class IsModeratorUser(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user.is_authenticated:
             return bool(request.user and request.user.is_moderator)
+        return False
 
 
 class IsAdminUser(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user.is_authenticated:
             return bool(request.user and request.user.is_admin)
+        return False
 
 
 class IsUser(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user.is_authenticated:
             return bool(request.user and request.user.is_user)
+        return False
 
 
 class IsAdminOrReadOnly(permissions.BasePermission):
