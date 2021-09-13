@@ -1,8 +1,9 @@
-from api_yamdb.settings import EMAIL_USER
 from django.core.mail import send_mail
 from django.utils.crypto import get_random_string
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+
+from api_yamdb.settings import EMAIL_USER
 from users.models import User
 
 

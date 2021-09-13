@@ -1,14 +1,7 @@
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from rest_framework import serializers
 
-from .models import (
-    Categories,
-    Genres,
-    Titles,
-    GenreTitle,
-    Review,
-    Comment,
-)
+from .models import Categories, Comment, Genres, GenreTitle, Review, Titles
 
 
 class CategoriesSerializer(serializers.ModelSerializer):

@@ -1,22 +1,15 @@
 from django_filters.rest_framework.backends import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
-from rest_framework.generics import get_object_or_404
 from rest_framework.decorators import permission_classes
-from users.permissions import (
-    ReviewCommentPermission,
-    IsAdminOrReadOnly,
-)
+from rest_framework.generics import get_object_or_404
+
+from users.permissions import IsAdminOrReadOnly, ReviewCommentPermission
 
 from .filters import TitleFilter
-from .models import Categories, Genres, Titles, Review, Comment
-from .serializers import (
-    CategoriesSerializer,
-    GenresSerializer,
-    TitlesCreateSerializer,
-    TitlesSerializer,
-    ReviewSerializer,
-    CommentSerializer,
-)
+from .models import Categories, Comment, Genres, Review, Titles
+from .serializers import (CategoriesSerializer, CommentSerializer,
+                          GenresSerializer, ReviewSerializer,
+                          TitlesCreateSerializer, TitlesSerializer)
 
 
 class ListCreateDestroyViewSet(
