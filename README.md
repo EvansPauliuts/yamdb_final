@@ -47,8 +47,12 @@ docker-compose exec app python manage.py collectstatic
 docker-compose exec app python manage.py createsuperuser
 ```
 
+#### Example of initialization of start data
+```shell
+docker exec <id_container_app> python manage.py dumpdata > fixtures.json
+```
+
 #### View API documentation
 ```shell
-  http://127.0.0.1:1337/redoc/
-  http://127.0.0.1:1337/swagger/
+  http://62.84.114.33/swagger/
 ```
