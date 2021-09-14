@@ -55,4 +55,5 @@ docker exec <id_container_app> python manage.py dumpdata > fixtures.json
 #### View API documentation
 ```shell
   http://62.84.114.33/swagger/
+  http://62.84.114.33/redoc/ 
 ```
