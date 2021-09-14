@@ -1,0 +1,1169 @@
+openapi: 3.0.2
+info:
+  title: 'yamdb api'
+  version: ''
+  description: |
+    запросы к api начинаются с `/api/v1/`
+
+    # описание
+    проект **yamdb** собирает отзывы пользователей на произведения. произведения делятся на категории: «книги», «фильмы», «музыка».
+
+    # алгоритм регистрации пользователей
+    1. пользователь отправляет запрос с параметром `email` на `/auth/email/`.
+    2. **yamdb** отправляет письмо с кодом подтверждения (`confirmation_code`) на адрес  `email` .
+    3. пользователь отправляет запрос с параметрами `email` и `confirmation_code` на `/auth/token/`, в ответе на запрос ему приходит `token` (jwt-токен).
+    4. при желании пользователь отправляет patch-запрос на `/users/me/` и заполняет поля в своём профайле (описание полей — в документации).
+
+    # пользовательские роли
+    - **аноним** — может просматривать описания произведений, читать отзывы и комментарии.
+    - **аутентифицированный пользователь** — может, как и **аноним**, читать всё, дополнительно он может публиковать отзывы и ставить рейтинг произведениям (фильмам/книгам/песенкам), может комментировать чужие отзывы и ставить им оценки; может редактировать и удалять **свои** отзывы и комментарии.
+    - **модератор** — те же права, что и у **аутентифицированного пользователя** плюс право удалять **любые** отзывы и комментарии.
+    - **администратор** — полные права на управление проектом и всем его содержимым. может создавать и удалять категории и произведения. может назначать роли пользователям.
+    - **администратор django** — те же права, что и у роли **администратор**.
+
+
+servers:
+  - url: /api/v1/
+
+tags:
+  - name: reviews
+    description: отзывы
+  - name: comments
+    description: комментарии к отзывам
+  - name: auth
+    description: аутентификация
+  - name: users
+    description: пользователи
+  - name: categories
+    description: категории (типы) произведений
+  - name: genres
+    description: категории жанров
+  - name: titles
+    description: произведения, к которым пишут отзывы (определённый фильм, книга или песенка).
+
+paths:
+  /titles/{title_id}/reviews/:
+    parameters:
+      - name: title_id
+        in: path
+        required: true
+        description: id объекта для оценки
+        schema:
+          type: number
+    get:
+      tags:
+        - reviews
+      description: |
+        получить список всех отзывов.
+
+        права доступа: **доступно без токена.**
+      responses:
+        200:
+          description: список отзывов с пагинацией
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    count:
+                      type: number
+                    next:
+                      type: string
+                    previous:
+                      type: string
+                    results:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/review'
+        404:
+          description: не найден объект оценки
+    post:
+      tags:
+        - reviews
+      description: |
+        создать новый отзыв. пользователь может оставить только один отзыв на один объект.
+
+        права доступа: **аутентифицированные пользователи.**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/review'
+      responses:
+        200:
+          description: 'новый отзыв'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/review'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        404:
+          description: не найден объект оценки
+      security:
+      - jwt_auth:
+        - write:user,moderator,admin
+  /titles/{title_id}/reviews/{review_id}/:
+    parameters:
+      - name: title_id
+        in: path
+        required: true
+        description: id объекта для оценки
+        schema:
+          type: number
+      - name: review_id
+        in: path
+        required: true
+        description: id отзыва
+        schema:
+          type: number
+    get:
+      tags:
+        - reviews
+      description: |
+        получить отзыв по id.
+
+        права доступа: **доступно без токена.**
+      responses:
+        200:
+          description: отзыв
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/review'
+        404:
+          description: не найден объект оценки
+    patch:
+      tags:
+        - reviews
+      description: |
+        частично обновить отзыв по id.
+
+        права доступа: **автор отзыва, модератор или администратор.**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/review'
+      responses:
+        200:
+          description: отзыв
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/review'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: не найден объект оценки
+      security:
+      - jwt_auth:
+        - write:user,moderator,admin
+    delete:
+      tags:
+        - reviews
+      description: |
+        удалить отзыв по id
+
+        права доступа: **автор отзыва, модератор или администратор.**
+      responses:
+        204:
+          description: ''
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: не найден объект оценки
+      security:
+      - jwt_auth:
+        - write:user,moderator,admin
+
+  /titles/{title_id}/reviews/{review_id}/comments/:
+    parameters:
+      - name: title_id
+        in: path
+        required: true
+        description: id объекта для оценки
+        schema:
+          type: number
+      - name: review_id
+        in: path
+        required: true
+        description: id отзыва
+        schema:
+          type: number
+    get:
+      tags:
+        - comments
+      description: |
+        получить список всех комментариев к отзыву по id
+
+        права доступа: **доступно без токена.**
+      responses:
+        200:
+          description: список комментариев с пагинацией
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    count:
+                      type: number
+                    next:
+                      type: string
+                    previous:
+                      type: string
+                    results:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/comment'
+        404:
+          description: не найден объект оценки или отзыв
+    post:
+      tags:
+        - comments
+      description: |
+        создать новый комментарий для отзыва.
+
+        права доступа: **аутентифицированные пользователи.**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/comment'
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/comment'
+          description: ''
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        404:
+          description: не найден объект оценки или отзыв
+      security:
+      - jwt_auth:
+        - write:user,moderator,admin
+
+  /titles/{title_id}/reviews/{review_id}/comments/{comment_id}/:
+    parameters:
+      - name: title_id
+        in: path
+        required: true
+        description: id объекта для оценки
+        schema:
+          type: number
+      - name: review_id
+        in: path
+        required: true
+        description: id отзыва
+        schema:
+          type: number
+      - name: comment_id
+        in: path
+        required: true
+        description: id комментария
+        schema:
+          type: number
+    get:
+      tags:
+        - comments
+      description: |
+        получить комментарий для отзыва по id.
+
+        права доступа: **доступно без токена.**
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/comment'
+          description: ''
+        404:
+          description: не найден объект оценки, отзыв или комментарий
+    patch:
+      tags:
+        - comments
+      description: |
+        частично обновить комментарий к отзыву по id.
+
+        права доступа: **автор комментария, модератор или администратор**.
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/comment'
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/comment'
+          description: ''
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: не найден объект оценки, отзыв или комментарий
+      security:
+      - jwt_auth:
+        - write:user,moderator,admin
+    delete:
+      tags:
+        - comments
+      description: |
+        удалить комментарий к отзыву по id.
+
+        права доступа: **автор комментария, модератор или администратор**.
+      responses:
+        204:
+          description: ''
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: не найден объект оценки, отзыв или комментарий
+      security:
+      - jwt_auth:
+        - write:user,moderator,admin
+
+  /auth/token/:
+    post:
+      tags:
+        - auth
+      description: получение jwt-токена в обмен на email и confirmation_code.
+      requestbody:
+        content:
+          application/json:
+            schema:
+              required:
+                - email
+                - confirmation_code
+              properties:
+                email:
+                  type: string
+                confirmation_code:
+                  type: string
+                  writeonly: true
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/token'
+          description: ''
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+  /auth/email/:
+    post:
+      tags:
+        - auth
+      description: отправление confirmation_code на переданный email.
+      parameters: []
+      requestbody:
+        content:
+          application/json:
+            schema:
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                properties:
+                  email:
+                    type: string
+                required:
+                - email
+          description: ''
+
+  /users/:
+    get:
+      tags:
+        - users
+      description: |
+        получить список всех пользователей.
+
+        права доступа: **администратор**
+      parameters:
+      - name: search
+        in: query
+        description: username пользователь для фильтрации, поиск по части username
+        schema:
+          type: string
+      responses:
+        200:
+          description: список пользователей с пагинацией
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    count:
+                      type: number
+                    next:
+                      type: string
+                    previous:
+                      type: string
+                    results:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/user'
+        401:
+          description: необходим jwt токен
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+    post:
+      tags:
+        - users
+      description: |
+        создание пользователя.
+
+        права доступа: **администратор**"
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/user'
+      responses:
+        201:
+          description: пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/user'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+  /users/{username}/:
+    parameters:
+      - name: username
+        in: path
+        required: true
+        description: username пользователя
+        schema:
+          type: string
+    get:
+      tags:
+        - users
+      description: |
+        получить пользователя по username.
+
+        права доступа: **администратор**
+      responses:
+        200:
+          description: объект пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/user'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: пользователь не найден
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+    patch:
+      tags:
+        - users
+      description: |
+        изменить данные пользователя по username.
+
+        права доступа: **администратор.**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/user'
+      responses:
+        200:
+          description: пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/user'
+        400:
+          description: ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: пользователь не найден
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+    delete:
+      tags:
+        - users
+      description: |
+        удалить пользователя по username.
+
+        права доступа: **администратор.**
+      responses:
+        204:
+          description: пользователь удалён
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: пользователь не найден
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+
+  /users/me/:
+    get:
+      tags:
+        - users
+      description: |
+        получить данные своей учетной записи
+
+        права доступа: **любой авторизованный пользователь**
+      responses:
+        200:
+          description: объект своей учетной записи
+          content:
+            application/json:
+              schema:
+                type: object
+                items:
+                  $ref: '#/components/schemas/user'
+      security:
+      - jwt_auth:
+        - read:admin,moderator,user
+        - write:admin,moderator,user
+    patch:
+      tags:
+        - users
+      description: |
+        изменить данные своей учетной записи
+
+        права доступа: **любой авторизованный пользователь**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/user'
+      responses:
+        200:
+          description: пользователь
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/user'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+      security:
+      - jwt_auth:
+        - read:admin,moderator,user
+        - write:admin,moderator,user
+
+  /categories/:
+    get:
+      tags:
+        - categories
+      description: |
+        получить список всех категорий
+
+        права доступа: **доступно без токена**
+      parameters:
+      - name: search
+        in: query
+        description: фильтрует по названию категории
+        schema:
+          type: string
+      responses:
+        200:
+          description: список категорий с пагинацией
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    count:
+                      type: number
+                    next:
+                      type: string
+                    previous:
+                      type: string
+                    results:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/category'
+    post:
+      tags:
+        - categories
+      description: |
+        создать категорию.
+
+        права доступа: **администратор.**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/category'
+      responses:
+        200:
+          description: список категорий
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/category'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+  /categories/{slug}/:
+    delete:
+      tags:
+        - categories
+      description: |
+        удалить категорию.
+
+        права доступа: **администратор.**
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        description: slug категории
+        schema:
+          type: string
+      responses:
+        204:
+          description: ''
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: категория не найдена
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+
+  /titles/:
+    get:
+      tags:
+        - titles
+      description: |
+        получить список всех объектов
+
+
+        права доступа: **доступно без токена**
+      parameters:
+        - name: category
+          in: query
+          description: фильтрует по slug категории
+          schema:
+            type: string
+        - name: genre
+          in: query
+          description: фильтрует по slug genre
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: фильтрует по части названия объекта
+          schema:
+            type: string
+        - name: year
+          in: query
+          description: фильтрует по году
+          schema:
+            type: number
+      responses:
+        200:
+          description: список объектов с пагинацией
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    count:
+                      type: number
+                    next:
+                      type: string
+                    previous:
+                      type: string
+                    results:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/title'
+    post:
+      tags:
+        - titles
+      description: |
+        создать произведение для отзывов.
+
+        права доступа: **администратор**.
+      parameters: []
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/titlecreate'
+      responses:
+        200:
+          description: список объектов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/title'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+  /titles/{titles_id}/:
+    parameters:
+      - name: titles_id
+        in: path
+        required: true
+        description: id объекта
+        schema:
+          type: number
+    get:
+      tags:
+        - titles
+      description: |
+        информация об объекте
+
+
+        права доступа: **доступно без токена**
+      responses:
+        200:
+          description: объект
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/title'
+        404:
+          description: объект не найден
+    patch:
+      tags:
+        - titles
+      description: |
+        обновить информацию об объекте
+
+
+        права доступа: **администратор**
+      requestbody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/titlecreate'
+      responses:
+        200:
+          description: объект
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/title'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: объект не найден
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+    delete:
+      tags:
+        - titles
+      description: |
+        удалить произведение.
+
+        права доступа: **администратор**.
+      responses:
+        204:
+          description: ''
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: объект не найден
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+
+  /genres/:
+    get:
+      tags:
+        - genres
+      description: |
+        получить список всех жанров
+
+        права доступа: **доступно без токена**
+      parameters:
+      - name: search
+        in: query
+        description: фильтрует по названию жанра
+        schema:
+          type: string
+      responses:
+        200:
+          description: список жанров с пагинацией
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    count:
+                      type: number
+                    next:
+                      type: string
+                    previous:
+                      type: string
+                    results:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/genre'
+    post:
+      tags:
+        - genres
+      description: |
+        создать жанр.
+
+        права доступа: **администратор**.
+      responses:
+        200:
+          description: список жанров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/genre'
+        400:
+          description: ошибка
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/validationerror'
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+      security:
+      - jwt_auth:
+        - read:admin
+        - write:admin
+
+  /genres/{slug}/:
+    delete:
+      tags:
+        - genres
+      description: |
+        удалить жанр.
+
+        права доступа: **администратор**.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        description: slug жанра
+        schema:
+          type: string
+      responses:
+        204:
+          description: ''
+        401:
+          description: необходим jwt токен
+        403:
+          description: нет прав доступа
+        404:
+          description: жанр не найден
+      security:
+      - auth:
+        - read:admin
+        - write:admin
+
+components:
+  schemas:
+    user:
+      title: пользователь
+      type: object
+      description: детальная информация о пользователе
+      required:
+          - username
+          - email
+      properties:
+        first_name:
+          type: string
+          title: имя
+        last_name:
+          type: string
+          title: фамилия
+        username:
+          type: string
+          title: username
+        bio:
+          type: string
+          title: о себе
+        email:
+          type: string
+          title: адрес электронной почты
+        role:
+          type: string
+          description: администратор, модератор или пользователь. по умолчанию `user`.
+          enum:
+            - user
+            - moderator
+            - admin
+
+    title:
+      title: объект
+      type: object
+      required:
+        - name
+      properties:
+        id:
+          type: integer
+          title: id произведения
+          readonly: true
+        name:
+          type: string
+          title: название
+        year:
+          type: number
+          title: год выпуска
+        rating:
+          type: number
+          readonly: true
+          title: рейтинг на основе отзывов, если отзывов — `none`
+        description:
+          type: string
+          title: описание
+        genre:
+          type: array
+          items:
+            $ref: '#/components/schemas/genre'
+        category:
+          $ref: '#/components/schemas/category'
+    titlecreate:
+      title: объект для изменения
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          title: название
+        year:
+          type: number
+          title: год выпуска
+        description:
+          type: string
+          title: описание
+        genre:
+          type: array
+          items:
+            type: string
+            title: slug жанра
+        category:
+          type: string
+          title: slug категории
+
+    genre:
+      title: жанр
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          title: название жанра
+        slug:
+          type: string
+          title: поле "slug"
+
+    review:
+      title: отзыв
+      type: object
+      description: детальная информация отзыва
+      required:
+          - text
+          - score
+      properties:
+        id:
+          type: integer
+          title: id  отзыва
+          readonly: true
+        text:
+          type: string
+          title: текст отзыва
+        author:
+          type: string
+          title: username пользователя
+          readonly: true
+        score:
+          type: integer
+          title: оценка
+          minimum: 1
+          maximum: 10
+        pub_date:
+          type: string
+          format: date-time
+          title: дата публикации отзыва
+          readonly: true
+
+    validationerror:
+      title: ошибка валидации
+      type: object
+      properties:
+        field_name:
+          type: array
+          items:
+            type: string
+
+    token:
+      title: токен
+      type: object
+      properties:
+        token:
+          type: string
+          title: access токен
+
+    comment:
+      title: комментарий
+      type: object
+      description: детальная информация комментария
+      required:
+        - text
+      properties:
+        id:
+          type: integer
+          title: id  комментария
+          readonly: true
+        text:
+          type: string
+          title: текст комментария
+        author:
+          type: string
+          title: username автора комментария
+          readonly: true
+        pub_date:
+          type: string
+          format: date-time
+          title: дата публикации комментария
+          readonly: true
+
+    category:
+      title: категория
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          title: название категории объекта
+        slug:
+          type: string
+          title: поле slug
+
+  securityschemes:
+    jwt_auth:
+      type: apikey
+      name: bearer
+      in: header

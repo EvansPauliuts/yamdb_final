@@ -34,12 +34,12 @@ make docker_down
 #### Install Django migrate
 ```shell
 docker-compose exec app python manage.py makemigrations
-docker-compose exec app python manage.py migrate
+docker-compose exec app python manage.py migrate --noinput
 ```
 
 #### Install static project
 ```shell
-docker-compose exec app python manage.py collectstatic
+docker-compose exec app python manage.py collectstatic --no-input
 ```
 
 #### Creating a Django superuser
